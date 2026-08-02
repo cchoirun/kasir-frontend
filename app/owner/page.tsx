@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { LogOut, Package, Plus, ShieldCheck, TrendingUp, CreditCard, Award, ArrowRight } from 'lucide-react';
+import { LogOut, Package, Plus, ShieldCheck, TrendingUp, CreditCard, Award, ArrowRight, Users } from 'lucide-react';
 
 export default function OwnerDashboard() {
   const [user, setUser] = useState<any>(null);
@@ -93,12 +93,20 @@ export default function OwnerDashboard() {
               <p className="text-xs text-gray-500">Selamat datang, {user?.nama}</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100"
-          >
-            <LogOut size={16} /> Logout
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push('/owner/pegawai')}
+              className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+            >
+              <Users size={16} /> Pegawai
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+            >
+              <LogOut size={16} /> Logout
+            </button>
+          </div>
         </div>
       </header>
 
