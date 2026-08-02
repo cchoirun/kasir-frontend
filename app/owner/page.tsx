@@ -3,21 +3,27 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { LogOut, Package, Plus, ShieldCheck, TrendingUp, CreditCard, Award, ArrowRight, Users } from 'lucide-react';
+import { LogOut, Package, Plus, ShieldCheck, TrendingUp, CreditCard, Award, ArrowRight, Users, Pencil, UserCircle } from 'lucide-react';
 
 export default function OwnerDashboard() {
   const [user, setUser] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [stats, setStats] = useState({ total_omzet: 0, total_transaksi: 0, top_products: [] });
   const [loading, setLoading] = useState(true);
+  
+  // State untuk Modal Form (Tambah & Edit)
   const [showModal, setShowModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     nama: '',
     kategori: '',
     harga: '',
     stok: '',
     stok_minimum: '5',
+    foto_produk: '', 
   });
+  
   const router = useRouter();
 
   useEffect(() => {
@@ -54,21 +60,67 @@ export default function OwnerDashboard() {
     }
   };
 
-  const handleCreateProduct = async (e: React.FormEvent) => {
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, foto_produk: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const openCreateModal = () => {
+    setIsEditing(false);
+    setEditId(null);
+    setFormData({ 
+      nama: '', 
+      kategori: '', 
+      harga: '', 
+      stok: '', 
+      stok_minimum: '5', 
+      foto_produk: '' 
+    });
+    setShowModal(true);
+  };
+
+  const openEditModal = (p: any) => {
+    setIsEditing(true);
+    setEditId(p.id);
+    setFormData({
+      nama: p.nama,
+      kategori: p.kategori,
+      harga: p.harga.toString(),
+      stok: p.stok.toString(),
+      stok_minimum: p.stok_minimum.toString(),
+      foto_produk: p.foto_produk || '',
+    });
+    setShowModal(true);
+  };
+
+  const handleSubmitProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/products', {
+      const payload = {
         nama: formData.nama,
         kategori: formData.kategori,
         harga: parseFloat(formData.harga),
         stok: parseInt(formData.stok),
         stok_minimum: parseInt(formData.stok_minimum),
-      });
+        foto_produk: formData.foto_produk,
+      };
+
+      if (isEditing && editId) {
+        await api.put(`/products/${editId}`, payload);
+      } else {
+        await api.post('/products', payload);
+      }
+
       setShowModal(false);
-      setFormData({ nama: '', kategori: '', harga: '', stok: '', stok_minimum: '5' });
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Gagal menambah produk');
+      alert(err.response?.data?.error || 'Gagal menyimpan produk');
     }
   };
 
@@ -94,6 +146,12 @@ export default function OwnerDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push('/profil')}
+              className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+            >
+              <UserCircle size={16} /> Profil
+            </button>
             <button
               onClick={() => router.push('/owner/pegawai')}
               className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
@@ -124,7 +182,6 @@ export default function OwnerDashboard() {
             </div>
           </div>
           
-          {/* Widget Transaksi - Kini bisa diklik menuju Riwayat */}
           <div 
             onClick={() => router.push('/riwayat')}
             className="group flex cursor-pointer items-center justify-between rounded-2xl bg-white p-6 shadow-sm border border-gray-100 transition hover:border-blue-300 hover:shadow-md"
@@ -141,7 +198,6 @@ export default function OwnerDashboard() {
             <ArrowRight className="text-gray-300 group-hover:text-blue-500 transition" size={24} />
           </div>
 
-          {/* Widget 5 Produk Terlaris */}
           <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 row-span-2">
             <div className="flex items-center gap-2 mb-4 text-orange-600 font-bold">
               <Award size={20} /> <h3>5 Produk Terlaris</h3>
@@ -175,7 +231,7 @@ export default function OwnerDashboard() {
                 <p className="text-xs text-gray-500">Pantau pergerakan stok barang</p>
               </div>
               <button
-                onClick={() => setShowModal(true)}
+                onClick={openCreateModal}
                 className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-blue-700"
               >
                 <Plus size={16} /> Tambah Produk
@@ -190,16 +246,26 @@ export default function OwnerDashboard() {
                     <th className="px-6 py-4">Harga</th>
                     <th className="px-6 py-4">Stok</th>
                     <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {products.length === 0 ? (
-                    <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-400">Belum ada produk.</td></tr>
+                    <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-400">Belum ada produk.</td></tr>
                   ) : (
                     products.map((p) => (
                       <tr key={p.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 font-medium flex items-center gap-2">
-                          <Package size={16} className="text-gray-400" /> {p.nama}
+                        
+                        {/* ===== INI KODE POIN E (THUMBNAIL FOTO DI TABEL) ===== */}
+                        <td className="px-6 py-4 font-medium flex items-center gap-3">
+                          {p.foto_produk ? (
+                            <img src={p.foto_produk} alt={p.nama} className="w-8 h-8 rounded object-cover border" />
+                          ) : (
+                            <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center border">
+                              <Package size={14} className="text-gray-400" />
+                            </div>
+                          )}
+                          {p.nama}
                         </td>
                         <td className="px-6 py-4 font-semibold text-gray-800">Rp {p.harga.toLocaleString('id-ID')}</td>
                         <td className="px-6 py-4 font-mono">{p.stok}</td>
@@ -209,6 +275,15 @@ export default function OwnerDashboard() {
                           ) : (
                             <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-600 uppercase border border-emerald-200">Aman</span>
                           )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button 
+                            onClick={() => openEditModal(p)} 
+                            className="p-2 text-blue-500 hover:bg-blue-50 hover:text-blue-700 rounded transition"
+                            title="Edit Produk"
+                          >
+                            <Pencil size={16} />
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -220,15 +295,28 @@ export default function OwnerDashboard() {
         </div>
       </main>
 
-      {/* Modal Tambah Produk (Sama seperti sebelumnya) */}
+      {/* Modal Tambah / Edit Produk */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-lg font-bold">Tambah Produk Baru</h3>
-            <form onSubmit={handleCreateProduct} className="space-y-4">
+            <h3 className="mb-4 text-lg font-bold">{isEditing ? 'Edit Produk' : 'Tambah Produk Baru'}</h3>
+            <form onSubmit={handleSubmitProduct} className="space-y-4">
+              <div className="flex flex-col items-center gap-3 mb-4">
+                <div className="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 overflow-hidden flex items-center justify-center bg-gray-50">
+                  {formData.foto_produk ? (
+                    <img src={formData.foto_produk} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <Package size={32} className="text-gray-300" />
+                  )}
+                </div>
+                <label className="cursor-pointer text-xs font-semibold text-blue-600 hover:text-blue-700">
+                  + Pilih Foto Tas
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                </label>
+              </div>
               <div>
                 <label className="block text-xs font-semibold uppercase text-gray-600 mb-1">Nama Produk</label>
-                <input type="text" required value={formData.nama} onChange={(e) => setFormData({ ...formData, nama: e.target.value })} className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Contoh: Kopi Susu" />
+                <input type="text" required value={formData.nama} onChange={(e) => setFormData({ ...formData, nama: e.target.value })} className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Contoh: Tas Ransel" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -242,7 +330,7 @@ export default function OwnerDashboard() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase text-gray-600 mb-1">Stok Awal</label>
+                  <label className="block text-xs font-semibold uppercase text-gray-600 mb-1">Stok Tersedia</label>
                   <input type="number" required value={formData.stok} onChange={(e) => setFormData({ ...formData, stok: e.target.value })} className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="100" />
                 </div>
                 <div>
@@ -252,7 +340,9 @@ export default function OwnerDashboard() {
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setShowModal(false)} className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-300">Batal</button>
-                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Simpan Produk</button>
+                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                  {isEditing ? 'Simpan Perubahan' : 'Simpan Produk'}
+                </button>
               </div>
             </form>
           </div>

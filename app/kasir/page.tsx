@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { ShoppingCart, LogOut, Trash2, Plus, Minus, QrCode, CheckCircle2, Search, History, Printer, X } from 'lucide-react';
+import { ShoppingCart, LogOut, Trash2, Plus, Minus, QrCode, CheckCircle2, Search, History, Printer, X, Key, UserCircle } from 'lucide-react';
 
 export default function KasirPage() {
   const [user, setUser] = useState<any>(null);
@@ -13,13 +13,15 @@ export default function KasirPage() {
   const [discount, setDiscount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   
-  // State untuk Modal QRIS
+  // State untuk berbagai Modal
   const [modalQR, setModalQR] = useState(false);
   const [qrisData, setQrisData] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<string>('pending');
-
-  // State untuk Struk Belanja
   const [receiptData, setReceiptData] = useState<any>(null);
+  
+  // State Khusus Ubah Password
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [pwdData, setPwdData] = useState({ old_password: '', new_password: '' });
 
   const router = useRouter();
 
@@ -61,9 +63,7 @@ export default function KasirPage() {
           alert('Jumlah melebihi stok!');
           return prevCart;
         }
-        return prevCart.map((item) =>
-          item.id === product.id ? { ...item, qty: item.qty + 1 } : item
-        );
+        return prevCart.map((item) => item.id === product.id ? { ...item, qty: item.qty + 1 } : item);
       }
       return [...prevCart, { ...product, qty: 1 }];
     });
@@ -71,15 +71,13 @@ export default function KasirPage() {
 
   const updateQty = (id: number, delta: number) => {
     setCart((prevCart) => {
-      return prevCart
-        .map((item) => {
+      return prevCart.map((item) => {
           if (item.id === id) {
             const newQty = item.qty + delta;
             return newQty > 0 ? { ...item, qty: newQty } : null;
           }
           return item;
-        })
-        .filter(Boolean);
+        }).filter(Boolean);
     });
   };
 
@@ -90,7 +88,6 @@ export default function KasirPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.harga * item.qty, 0);
   const finalTotal = subtotal - discount > 0 ? subtotal - discount : 0;
 
-  // Fungsi sentral untuk menangani transaksi sukses dan memunculkan struk
   const handleTransactionSuccess = (metode: string, transactionId: number, refId?: string) => {
     setReceiptData({
       id: transactionId,
@@ -103,24 +100,20 @@ export default function KasirPage() {
       tanggal: new Date().toLocaleString('id-ID'),
       kasir: user?.nama || 'Kasir'
     });
-    
-    // Reset state setelah sukses
     setCart([]);
     setDiscount(0);
     setModalQR(false);
-    fetchProducts(); // Refresh stok
+    fetchProducts(); 
   };
 
   const handleCheckout = async (metode: 'tunai' | 'qris') => {
     if (cart.length === 0) return alert('Keranjang masih kosong');
-
     try {
       const payload = {
         metode_bayar: metode,
         discount: discount,
         items: cart.map(item => ({ product_id: item.id, qty: item.qty }))
       };
-
       const res = await api.post('/transactions', payload);
       const transaction = res.data.transaction;
 
@@ -147,6 +140,19 @@ export default function KasirPage() {
     }
   };
 
+  // Fungsi Ganti Password
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.put('/auth/change-password', pwdData);
+      alert('Password berhasil diperbarui! Silakan gunakan password baru pada login berikutnya.');
+      setShowPasswordModal(false);
+      setPwdData({ old_password: '', new_password: '' });
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Gagal mengubah password');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -159,29 +165,27 @@ export default function KasirPage() {
 
   return (
     <>
-      {/* 
-        Container utama POS dibungkus dengan "print:hidden" 
-        sehingga saat dicetak (Ctrl+P), aplikasi POS menghilang dari kertas.
-      */}
       <div className="flex h-screen bg-gray-100 text-gray-900 overflow-hidden print:hidden">
         
-        {/* Sisi Kiri: List Produk */}
         <div className="flex-1 flex flex-col h-full border-r border-gray-200">
           <header className="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm">
             <div>
               <h1 className="text-lg font-bold">Kasir POS</h1>
               <p className="text-xs text-gray-500">Petugas: {user?.nama}</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => router.push('/riwayat')}
-                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-200"
+                className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-200"
               >
                 <History size={14} /> Riwayat
               </button>
+              <button onClick={() => router.push('/profil')} className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-100">
+                  <UserCircle size={14} /> Profil
+              </button>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100"
               >
                 <LogOut size={14} /> Keluar
               </button>
@@ -220,7 +224,6 @@ export default function KasirPage() {
           </div>
         </div>
 
-        {/* Sisi Kanan: Keranjang */}
         <div className="w-[400px] bg-white flex flex-col h-full shadow-lg z-10">
           <div className="p-4 border-b flex items-center gap-2 font-bold text-gray-800">
             <ShoppingCart size={20} /> Keranjang Belanja
@@ -283,36 +286,70 @@ export default function KasirPage() {
         </div>
       )}
 
-      {/* 
-        MODAL STRUK DIGITAL 
-        Hanya komponen ini yang akan terlihat di kertas/PDF saat tombol "Cetak" ditekan
-      */}
+      {/* Modal Ubah Password */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm print:hidden">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="mb-4 text-lg font-bold flex items-center gap-2"><Key size={20} className="text-blue-600"/> Ganti Password</h3>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Password Lama</label>
+                <input type="password" required value={pwdData.old_password} onChange={(e) => setPwdData({ ...pwdData, old_password: e.target.value })} className="w-full rounded-lg border p-2.5 text-sm focus:ring-1 focus:ring-blue-500" placeholder="Masukkan password saat ini" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Password Baru</label>
+                <input type="password" required value={pwdData.new_password} onChange={(e) => setPwdData({ ...pwdData, new_password: e.target.value })} className="w-full rounded-lg border p-2.5 text-sm focus:ring-1 focus:ring-blue-500" placeholder="Buat password baru" />
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button type="button" onClick={() => setShowPasswordModal(false)} className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700">Batal</button>
+                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Simpan Password</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL STRUK DIGITAL */}
       {receiptData && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm print:static print:bg-white print:block print:p-0">
-          <div className="w-full max-w-[320px] rounded-2xl bg-white p-6 shadow-2xl print:w-full print:max-w-none print:shadow-none print:p-0 print:rounded-none">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm print:static print:bg-white print:flex print:justify-start print:p-0 print:m-0">
+          
+          {/* Injeksi CSS Khusus Printer Thermal */}
+          <style dangerouslySetInnerHTML={{__html: `
+            @media print {
+              @page {
+                margin: 0; /* Menghilangkan margin bawaan kertas */
+                size: 80mm auto; /* Mengatur ukuran kertas jadi 80mm (standar thermal) */
+              }
+              body {
+                -webkit-print-color-adjust: exact;
+              }
+            }
+          `}} />
+
+          {/* Wrapper Struk - Lebar dikunci ke ukuran struk saat diprint */}
+          <div className="w-full max-w-[320px] rounded-2xl bg-white p-6 shadow-2xl print:w-[80mm] print:max-w-[80mm] print:shadow-none print:p-2 print:rounded-none print:m-0">
             
-            {/* Area Struk yang akan dicetak */}
             <div className="font-mono text-sm text-black">
-              <div className="text-center mb-4">
-                <h2 className="text-lg font-bold uppercase">Aplikasi Kasir QRIS</h2>
-                <p className="text-xs">Jl. Keputih No. 123, Surabaya</p>
-                <p className="text-xs">Telp: 0812-3456-7890</p>
+              <div className="text-center mb-4 border-b border-dashed border-gray-400 pb-3">
+                <h2 className="text-base font-bold uppercase">Aplikasi Kasir QRIS</h2>
+                <p className="text-[11px] text-gray-600">Jl. Keputih No. 123, Surabaya</p>
+                <p className="text-[11px] text-gray-600">Telp: 0812-3456-7890</p>
               </div>
               
-              <div className="border-b border-dashed border-gray-400 pb-2 mb-2 text-xs">
-                <div className="flex justify-between"><span className="text-gray-500">Tanggal:</span> <span>{receiptData.tanggal}</span></div>
+              <div className="border-b border-dashed border-gray-400 pb-2 mb-3 text-xs space-y-0.5">
+                <div className="flex justify-between"><span className="text-gray-500">Waktu:</span> <span>{receiptData.tanggal}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Kasir:</span> <span>{receiptData.kasir}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Metode:</span> <span className="uppercase font-bold">{receiptData.metode}</span></div>
                 {receiptData.metode === 'qris' && (
-                  <div className="flex justify-between"><span className="text-gray-500">Ref:</span> <span className="truncate ml-2">{receiptData.refId}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Ref ID:</span> <span className="truncate ml-2">{receiptData.refId}</span></div>
                 )}
               </div>
 
-              <div className="space-y-2 text-xs mb-2">
-                {receiptData.items.map((item: any) => (
-                  <div key={item.id}>
-                    <div className="font-semibold">{item.nama}</div>
-                    <div className="flex justify-between">
+              <div className="space-y-2 text-xs mb-3">
+                {receiptData.items.map((item: any, idx: number) => (
+                  <div key={idx}>
+                    <div className="font-semibold text-gray-800">{item.nama}</div>
+                    <div className="flex justify-between text-gray-600">
                       <span>{item.qty} x {item.harga.toLocaleString('id-ID')}</span>
                       <span>{(item.qty * item.harga).toLocaleString('id-ID')}</span>
                     </div>
@@ -321,20 +358,19 @@ export default function KasirPage() {
               </div>
 
               <div className="border-t border-dashed border-gray-400 pt-2 text-xs space-y-1">
-                <div className="flex justify-between"><span>Subtotal:</span> <span>{receiptData.subtotal.toLocaleString('id-ID')}</span></div>
-                <div className="flex justify-between"><span>Diskon:</span> <span>- {receiptData.discount.toLocaleString('id-ID')}</span></div>
-                <div className="flex justify-between font-bold text-sm mt-1 border-t border-gray-300 pt-1">
+                <div className="flex justify-between text-gray-600"><span>Subtotal:</span> <span>{receiptData.subtotal.toLocaleString('id-ID')}</span></div>
+                <div className="flex justify-between text-gray-600"><span>Diskon:</span> <span>- {receiptData.discount.toLocaleString('id-ID')}</span></div>
+                <div className="flex justify-between font-bold text-sm mt-1 border-t border-gray-300 pt-1 text-black">
                   <span>TOTAL:</span> <span>Rp {receiptData.total.toLocaleString('id-ID')}</span>
                 </div>
               </div>
 
-              <div className="text-center text-xs mt-6">
-                <p>Terima Kasih</p>
-                <p>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
+              <div className="text-center text-[11px] text-gray-500 mt-6 pt-2 border-t border-gray-200">
+                <p>Terima Kasih atas Kunjungan Anda!</p>
+                <p className="text-[10px]">Barang yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
               </div>
             </div>
 
-            {/* Tombol Aksi (Akan hilang saat di-print) */}
             <div className="mt-8 flex gap-3 print:hidden">
               <button 
                 onClick={() => setReceiptData(null)}
