@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { ShoppingCart, LogOut, Trash2, Plus, Minus, QrCode, CheckCircle2, Search, History } from 'lucide-react';
+import { ShoppingCart, LogOut, Trash2, Plus, Minus, QrCode, CheckCircle2, Search, History, Printer, X } from 'lucide-react';
 
 export default function KasirPage() {
   const [user, setUser] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
-  const [searchQuery, setSearchQuery] = useState(''); // State untuk fitur pencarian
+  const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<any[]>([]);
   const [discount, setDiscount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -17,6 +17,10 @@ export default function KasirPage() {
   const [modalQR, setModalQR] = useState(false);
   const [qrisData, setQrisData] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<string>('pending');
+
+  // State untuk Struk Belanja
+  const [receiptData, setReceiptData] = useState<any>(null);
+
   const router = useRouter();
 
   useEffect(() => {
@@ -40,7 +44,6 @@ export default function KasirPage() {
     }
   };
 
-  // Logika Pencarian Barang (Filter)
   const filteredProducts = products.filter((p) => 
     p.nama.toLowerCase().includes(searchQuery.toLowerCase()) || 
     (p.kategori && p.kategori.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -51,12 +54,11 @@ export default function KasirPage() {
       alert('Stok produk habis!');
       return;
     }
-
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.id === product.id);
       if (existing) {
         if (existing.qty >= product.stok) {
-          alert('Jumlah melebihi stok yang tersedia!');
+          alert('Jumlah melebihi stok!');
           return prevCart;
         }
         return prevCart.map((item) =>
@@ -88,30 +90,42 @@ export default function KasirPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.harga * item.qty, 0);
   const finalTotal = subtotal - discount > 0 ? subtotal - discount : 0;
 
+  // Fungsi sentral untuk menangani transaksi sukses dan memunculkan struk
+  const handleTransactionSuccess = (metode: string, transactionId: number, refId?: string) => {
+    setReceiptData({
+      id: transactionId,
+      metode: metode,
+      refId: refId || '-',
+      items: [...cart],
+      subtotal: subtotal,
+      discount: discount,
+      total: finalTotal,
+      tanggal: new Date().toLocaleString('id-ID'),
+      kasir: user?.nama || 'Kasir'
+    });
+    
+    // Reset state setelah sukses
+    setCart([]);
+    setDiscount(0);
+    setModalQR(false);
+    fetchProducts(); // Refresh stok
+  };
+
   const handleCheckout = async (metode: 'tunai' | 'qris') => {
-    if (cart.length === 0) {
-      alert('Keranjang masih kosong');
-      return;
-    }
+    if (cart.length === 0) return alert('Keranjang masih kosong');
 
     try {
       const payload = {
         metode_bayar: metode,
         discount: discount,
-        items: cart.map(item => ({
-          product_id: item.id,
-          qty: item.qty
-        }))
+        items: cart.map(item => ({ product_id: item.id, qty: item.qty }))
       };
 
       const res = await api.post('/transactions', payload);
       const transaction = res.data.transaction;
 
       if (metode === 'tunai') {
-        alert('Transaksi Tunai Berhasil Disimpan & Lunas!');
-        setCart([]);
-        setDiscount(0);
-        fetchProducts(); // Refresh stok dari backend
+        handleTransactionSuccess('tunai', transaction.id);
       } else {
         const qrisRes = await api.get(`/transactions/${transaction.id}/qris`);
         setQrisData(qrisRes.data);
@@ -126,13 +140,8 @@ export default function KasirPage() {
   const simulatePaymentSuccess = async () => {
     if (!qrisData) return;
     try {
-      await api.post('/webhooks/payment', {
-        qris_reference_id: qrisData.qris_reference_id
-      });
-      setPaymentStatus('lunas');
-      setCart([]);
-      setDiscount(0);
-      fetchProducts();
+      await api.post('/webhooks/payment', { qris_reference_id: qrisData.qris_reference_id });
+      handleTransactionSuccess('qris', qrisData.transaction_id, qrisData.qris_reference_id);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Gagal simulasi pembayaran');
     }
@@ -145,170 +154,115 @@ export default function KasirPage() {
   };
 
   if (loading) {
-    return <div className="flex h-screen items-center justify-center bg-gray-900 text-white">Memuat POS Kasir...</div>;
+    return <div className="flex h-screen items-center justify-center bg-gray-900 text-white">Memuat POS...</div>;
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 text-gray-900 overflow-hidden">
-      {/* Sisi Kiri: List Produk & Pencarian */}
-      <div className="flex-1 flex flex-col h-full border-r border-gray-200">
-        {/* Header POS */}
-        <header className="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm">
-          <div>
-            <h1 className="text-lg font-bold">Kasir POS</h1>
-            <p className="text-xs text-gray-500">Petugas: {user?.nama}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push('/riwayat')}
-              className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-200"
-            >
-              <History size={14} /> Riwayat
-            </button>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100"
-            >
-              <LogOut size={14} /> Keluar
-            </button>
-          </div>
-        </header>
-
-        {/* Toolbar Pencarian */}
-        <div className="bg-white p-4 border-b border-gray-100">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type="text"
-              placeholder="Cari nama atau kategori produk..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-gray-50"
-            />
-          </div>
-        </div>
-
-        {/* List Produk (Bentuk Baris/Daftar) */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
-          {filteredProducts.length === 0 ? (
-            <div className="text-center text-gray-400 mt-10 text-sm">Produk tidak ditemukan.</div>
-          ) : (
-            filteredProducts.map((p) => (
-              <div
-                key={p.id}
-                className={`flex items-center justify-between p-4 rounded-xl border bg-white shadow-sm transition hover:shadow-md ${
-                  p.stok <= 0 ? 'opacity-60 bg-gray-50' : 'border-gray-200'
-                }`}
+    <>
+      {/* 
+        Container utama POS dibungkus dengan "print:hidden" 
+        sehingga saat dicetak (Ctrl+P), aplikasi POS menghilang dari kertas.
+      */}
+      <div className="flex h-screen bg-gray-100 text-gray-900 overflow-hidden print:hidden">
+        
+        {/* Sisi Kiri: List Produk */}
+        <div className="flex-1 flex flex-col h-full border-r border-gray-200">
+          <header className="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm">
+            <div>
+              <h1 className="text-lg font-bold">Kasir POS</h1>
+              <p className="text-xs text-gray-500">Petugas: {user?.nama}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => router.push('/riwayat')}
+                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-200"
               >
+                <History size={14} /> Riwayat
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+              >
+                <LogOut size={14} /> Keluar
+              </button>
+            </div>
+          </header>
+
+          <div className="bg-white p-4 border-b border-gray-100">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="text"
+                placeholder="Cari produk..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
+            {filteredProducts.map((p) => (
+              <div key={p.id} className={`flex items-center justify-between p-4 rounded-xl border bg-white shadow-sm transition hover:shadow-md ${p.stok <= 0 ? 'opacity-60 bg-gray-50' : 'border-gray-200'}`}>
                 <div className="flex flex-col">
-                  <span className="text-[10px] uppercase font-bold text-blue-600 mb-1 tracking-wider">
-                    {p.kategori || 'Umum'}
-                  </span>
-                  <span className="font-semibold text-gray-800 text-sm md:text-base">{p.nama}</span>
-                  <span className="text-xs mt-1 text-gray-500">
-                    Sisa Stok:{' '}
-                    <span className={`font-bold ${p.stok <= p.stok_minimum ? 'text-red-500' : 'text-green-600'}`}>
-                      {p.stok}
-                    </span>
-                  </span>
+                  <span className="text-[10px] uppercase font-bold text-blue-600 mb-1">{p.kategori || 'Umum'}</span>
+                  <span className="font-semibold text-gray-800 text-sm">{p.nama}</span>
+                  <span className="text-xs mt-1 text-gray-500">Stok: <span className={p.stok <= p.stok_minimum ? 'text-red-500 font-bold' : 'text-green-600 font-bold'}>{p.stok}</span></span>
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="font-bold text-gray-900">Rp {p.harga.toLocaleString('id-ID')}</span>
-                  <button
-                    onClick={() => addToCart(p)}
-                    disabled={p.stok <= 0}
-                    className={`p-2 rounded-lg transition ${
-                      p.stok <= 0 
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
-                        : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'
-                    }`}
-                  >
+                  <button onClick={() => addToCart(p)} disabled={p.stok <= 0} className={`p-2 rounded-lg transition ${p.stok <= 0 ? 'bg-gray-200 text-gray-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'}`}>
                     <Plus size={20} />
                   </button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Sisi Kanan: Keranjang & Checkout (Tetap Sama) */}
-      <div className="w-[400px] bg-white flex flex-col h-full shadow-lg z-10">
-        <div className="p-4 border-b flex items-center gap-2 font-bold text-gray-800">
-          <ShoppingCart size={20} /> Keranjang Belanja
+            ))}
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 divide-y divide-gray-100">
-          {cart.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center text-center text-gray-400">
-              <ShoppingCart size={40} className="mb-2 stroke-1" />
-              <p className="text-sm">Keranjang masih kosong</p>
-              <p className="text-xs">Klik tombol [+] di kiri untuk menambahkan</p>
-            </div>
-          ) : (
-            cart.map((item) => (
+        {/* Sisi Kanan: Keranjang */}
+        <div className="w-[400px] bg-white flex flex-col h-full shadow-lg z-10">
+          <div className="p-4 border-b flex items-center gap-2 font-bold text-gray-800">
+            <ShoppingCart size={20} /> Keranjang Belanja
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 divide-y divide-gray-100">
+            {cart.map((item) => (
               <div key={item.id} className="pt-3 first:pt-0 flex items-center justify-between">
                 <div className="flex-1 pr-2">
                   <h4 className="text-sm font-semibold text-gray-800">{item.nama}</h4>
                   <p className="text-xs text-gray-500">Rp {item.harga.toLocaleString('id-ID')}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => updateQty(item.id, -1)} className="rounded bg-gray-100 p-1 hover:bg-gray-200">
-                    <Minus size={14} />
-                  </button>
+                  <button onClick={() => updateQty(item.id, -1)} className="rounded bg-gray-100 p-1 hover:bg-gray-200"><Minus size={14} /></button>
                   <span className="text-sm font-semibold w-5 text-center">{item.qty}</span>
-                  <button onClick={() => updateQty(item.id, 1)} className="rounded bg-gray-100 p-1 hover:bg-gray-200">
-                    <Plus size={14} />
-                  </button>
-                  <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600 ml-2">
-                    <Trash2 size={16} />
-                  </button>
+                  <button onClick={() => updateQty(item.id, 1)} className="rounded bg-gray-100 p-1 hover:bg-gray-200"><Plus size={14} /></button>
+                  <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600 ml-2"><Trash2 size={16} /></button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
-
-        <div className="p-4 border-t bg-gray-50 space-y-3">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Subtotal</span>
-            <span className="font-medium">Rp {subtotal.toLocaleString('id-ID')}</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500">Diskon (Rp)</span>
-            <input
-              type="number"
-              value={discount}
-              onChange={(e) => setDiscount(Math.max(0, Number(e.target.value)))}
-              className="w-28 rounded border border-gray-300 p-1.5 text-right text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
-              placeholder="0"
-            />
-          </div>
-          <div className="flex justify-between text-base font-bold border-t pt-2">
-            <span>Total Akhir</span>
-            <span className="text-blue-600">Rp {finalTotal.toLocaleString('id-ID')}</span>
+            ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 pt-2">
-            <button
-              onClick={() => handleCheckout('tunai')}
-              className="rounded-lg bg-emerald-600 py-3 text-xs font-semibold text-white shadow hover:bg-emerald-700 transition"
-            >
-              Bayar Tunai
-            </button>
-            <button
-              onClick={() => handleCheckout('qris')}
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-3 text-xs font-semibold text-white shadow hover:bg-blue-700 transition"
-            >
-              <QrCode size={16} /> Bayar QRIS
-            </button>
+          <div className="p-4 border-t bg-gray-50 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Diskon (Rp)</span>
+              <input type="number" value={discount} onChange={(e) => setDiscount(Math.max(0, Number(e.target.value)))} className="w-28 rounded border border-gray-300 p-1.5 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="0" />
+            </div>
+            <div className="flex justify-between text-base font-bold border-t pt-2">
+              <span>Total Akhir</span>
+              <span className="text-blue-600">Rp {finalTotal.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button onClick={() => handleCheckout('tunai')} className="rounded-lg bg-emerald-600 py-3 text-xs font-semibold text-white shadow hover:bg-emerald-700">Bayar Tunai</button>
+              <button onClick={() => handleCheckout('qris')} className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-3 text-xs font-semibold text-white shadow hover:bg-blue-700"><QrCode size={16} /> Bayar QRIS</button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Modal QRIS (Tetap Sama) */}
+      {/* Modal QRIS Pending */}
       {modalQR && qrisData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm print:hidden">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl text-center">
             <h3 className="text-lg font-bold text-gray-800">Scan QRIS</h3>
             <p className="text-xs text-gray-500 mb-4">Arahkan m-banking / e-wallet</p>
@@ -316,39 +270,89 @@ export default function KasirPage() {
               <img src={qrisData.qr_image_url} alt="QRIS Code" className="w-56 h-56 object-contain" />
             </div>
             <p className="text-sm font-bold text-gray-800">Total: Rp {qrisData.total_amount.toLocaleString('id-ID')}</p>
-            <p className="text-[10px] text-gray-400 mt-1">Ref ID: {qrisData.qris_reference_id}</p>
-
-            {paymentStatus === 'lunas' ? (
-              <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-green-50 p-3 text-green-700 font-semibold text-sm border border-green-200">
-                <CheckCircle2 size={18} /> Pembayaran Lunas!
-              </div>
-            ) : (
-              <div className="mt-4 space-y-2">
-                <button
-                  onClick={simulatePaymentSuccess}
-                  className="w-full rounded-lg bg-blue-600 py-2.5 text-xs font-semibold text-white hover:bg-blue-700 transition"
-                >
-                  [Simulasi] Sukses Bayar
-                </button>
-                <button
-                  onClick={() => setModalQR(false)}
-                  className="w-full rounded-lg bg-gray-200 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-300 transition"
-                >
-                  Tutup
-                </button>
-              </div>
-            )}
-            {paymentStatus === 'lunas' && (
-              <button
-                onClick={() => setModalQR(false)}
-                className="mt-3 w-full rounded-lg bg-gray-800 py-2 text-xs font-semibold text-white hover:bg-gray-900 transition"
-              >
-                Selesai
+            
+            <div className="mt-4 space-y-2">
+              <button onClick={simulatePaymentSuccess} className="w-full rounded-lg bg-blue-600 py-2.5 text-xs font-semibold text-white hover:bg-blue-700 transition">
+                [Simulasi] Sukses Bayar
               </button>
-            )}
+              <button onClick={() => setModalQR(false)} className="w-full rounded-lg bg-gray-200 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-300 transition">
+                Batalkan
+              </button>
+            </div>
           </div>
         </div>
       )}
-    </div>
+
+      {/* 
+        MODAL STRUK DIGITAL 
+        Hanya komponen ini yang akan terlihat di kertas/PDF saat tombol "Cetak" ditekan
+      */}
+      {receiptData && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm print:static print:bg-white print:block print:p-0">
+          <div className="w-full max-w-[320px] rounded-2xl bg-white p-6 shadow-2xl print:w-full print:max-w-none print:shadow-none print:p-0 print:rounded-none">
+            
+            {/* Area Struk yang akan dicetak */}
+            <div className="font-mono text-sm text-black">
+              <div className="text-center mb-4">
+                <h2 className="text-lg font-bold uppercase">Aplikasi Kasir QRIS</h2>
+                <p className="text-xs">Jl. Keputih No. 123, Surabaya</p>
+                <p className="text-xs">Telp: 0812-3456-7890</p>
+              </div>
+              
+              <div className="border-b border-dashed border-gray-400 pb-2 mb-2 text-xs">
+                <div className="flex justify-between"><span className="text-gray-500">Tanggal:</span> <span>{receiptData.tanggal}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Kasir:</span> <span>{receiptData.kasir}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Metode:</span> <span className="uppercase font-bold">{receiptData.metode}</span></div>
+                {receiptData.metode === 'qris' && (
+                  <div className="flex justify-between"><span className="text-gray-500">Ref:</span> <span className="truncate ml-2">{receiptData.refId}</span></div>
+                )}
+              </div>
+
+              <div className="space-y-2 text-xs mb-2">
+                {receiptData.items.map((item: any) => (
+                  <div key={item.id}>
+                    <div className="font-semibold">{item.nama}</div>
+                    <div className="flex justify-between">
+                      <span>{item.qty} x {item.harga.toLocaleString('id-ID')}</span>
+                      <span>{(item.qty * item.harga).toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-dashed border-gray-400 pt-2 text-xs space-y-1">
+                <div className="flex justify-between"><span>Subtotal:</span> <span>{receiptData.subtotal.toLocaleString('id-ID')}</span></div>
+                <div className="flex justify-between"><span>Diskon:</span> <span>- {receiptData.discount.toLocaleString('id-ID')}</span></div>
+                <div className="flex justify-between font-bold text-sm mt-1 border-t border-gray-300 pt-1">
+                  <span>TOTAL:</span> <span>Rp {receiptData.total.toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+
+              <div className="text-center text-xs mt-6">
+                <p>Terima Kasih</p>
+                <p>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
+              </div>
+            </div>
+
+            {/* Tombol Aksi (Akan hilang saat di-print) */}
+            <div className="mt-8 flex gap-3 print:hidden">
+              <button 
+                onClick={() => setReceiptData(null)}
+                className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-gray-200 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-300"
+              >
+                <X size={16} /> Tutup
+              </button>
+              <button 
+                onClick={() => window.print()}
+                className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                <Printer size={16} /> Cetak Struk
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+    </>
   );
 }
