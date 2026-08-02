@@ -19,7 +19,7 @@ export default function PegawaiPage() {
   const fetchUsers = async () => {
     try {
       const res = await api.get('/users');
-      setUsers(res.data.users || []);
+      setUsers(res.data.data || []);
     } catch (err) {
       console.error('Gagal memuat kasir', err);
     } finally {

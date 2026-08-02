@@ -47,7 +47,7 @@ export default function OwnerDashboard() {
         api.get('/products'),
         api.get('/analytics/dashboard')
       ]);
-      setProducts(resProducts.data.products || []);
+      setProducts(resProducts.data.data || []);
       setStats({
         total_omzet: resStats.data.total_omzet || 0,
         total_transaksi: resStats.data.total_transaksi || 0,
