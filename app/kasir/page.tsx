@@ -38,7 +38,7 @@ export default function KasirPage() {
   const fetchProducts = async () => {
     try {
       const res = await api.get('/products');
-      setProducts(res.data.products || []);
+      setProducts(res.data.data || []);
     } catch (err) {
       console.error('Gagal memuat produk', err);
     } finally {
@@ -313,7 +313,6 @@ export default function KasirPage() {
       {receiptData && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm print:static print:bg-white print:flex print:justify-start print:p-0 print:m-0">
           
-          {/* Injeksi CSS Khusus Printer Thermal */}
           <style dangerouslySetInnerHTML={{__html: `
             @media print {
               @page {
@@ -326,7 +325,6 @@ export default function KasirPage() {
             }
           `}} />
 
-          {/* Wrapper Struk - Lebar dikunci ke ukuran struk saat diprint */}
           <div className="w-full max-w-[320px] rounded-2xl bg-white p-6 shadow-2xl print:w-[80mm] print:max-w-[80mm] print:shadow-none print:p-2 print:rounded-none print:m-0">
             
             <div className="font-mono text-sm text-black">
