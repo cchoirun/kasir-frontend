@@ -24,7 +24,7 @@ export default function RiwayatPage() {
   const fetchTransactions = async () => {
     try {
       const res = await api.get('/transactions');
-      setTransactions(res.data.transactions || []);
+      setTransactions(res.data.data || []);
     } catch (err) {
       console.error('Gagal memuat riwayat', err);
     } finally {
