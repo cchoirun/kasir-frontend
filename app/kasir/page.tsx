@@ -109,13 +109,23 @@ export default function KasirPage() {
   const handleCheckout = async (metode: 'tunai' | 'qris') => {
     if (cart.length === 0) return alert('Keranjang masih kosong');
     try {
+     
       const payload = {
         metode_bayar: metode,
         discount: discount,
-        items: cart.map(item => ({ product_id: item.id, qty: item.qty }))
+        total_amount: finalTotal,
+        kasir_id: user?.id,       
+        items: cart.map(item => ({
+          product_id: item.id,
+          qty: item.qty,
+          harga_satuan: item.harga,           
+          subtotal: item.harga * item.qty      
+        }))
       };
+      
       const res = await api.post('/transactions', payload);
-      const transaction = res.data.transaction;
+      
+      const transaction = res.data.data;
 
       if (metode === 'tunai') {
         handleTransactionSuccess('tunai', transaction.id);
