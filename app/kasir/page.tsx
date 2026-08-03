@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Swal from 'sweetalert2';
 import api from '@/lib/api';
 import { ShoppingCart, LogOut, Trash2, Plus, Minus, QrCode, CheckCircle2, Search, History, Printer, X, Key, UserCircle } from 'lucide-react';
 
@@ -53,9 +54,13 @@ export default function KasirPage() {
 
   const addToCart = (product: any) => {
     if (product.stok <= 0) {
-      alert('Stok produk habis!');
-      return;
-    }
+   return Swal.fire({
+     title: 'Stok Habis',
+     text: `Maaf, stok ${product.nama} sedang kosong.`,
+     icon: 'error',
+     confirmButtonColor: '#dc2626', // Warna red-600 Tailwind
+   });
+ }
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.id === product.id);
       if (existing) {
@@ -107,7 +112,15 @@ export default function KasirPage() {
   };
 
   const handleCheckout = async (metode: 'tunai' | 'qris') => {
-    if (cart.length === 0) return alert('Keranjang masih kosong');
+    if (cart.length === 0) {
+   return Swal.fire({
+     title: 'Keranjang Kosong!',
+     text: 'Silakan tambahkan produk terlebih dahulu.',
+     icon: 'warning',
+     confirmButtonColor: '#2563eb', 
+     confirmButtonText: 'Oke, Mengerti'
+   });
+ }
     try {
      
       const payload = {

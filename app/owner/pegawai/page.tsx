@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Swal from 'sweetalert2';
 import api from '@/lib/api';
 import { ArrowLeft, Users, Plus, Trash2 } from 'lucide-react';
 
@@ -39,13 +40,41 @@ export default function PegawaiPage() {
     }
   };
 
-  const handleDelete = async (id: number, nama: string) => {
-    if (!confirm(`Yakin ingin menghapus akun kasir: ${nama}?`)) return;
-    try {
-      await api.delete(`/users/${id}`);
-      fetchUsers();
-    } catch (err) {
-      alert('Gagal menghapus kasir');
+ const handleDelete = async (id: number, nama: string) => {
+    // Memunculkan pop-up konfirmasi yang modern
+    const result = await Swal.fire({
+      title: 'Hapus Akun?',
+      text: `Yakin ingin menghapus akun kasir: ${nama}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626', // Warna red-600 Tailwind untuk tombol bahaya
+      cancelButtonColor: '#9ca3af',  // Warna gray-400 Tailwind untuk tombol batal
+      confirmButtonText: 'Ya, Hapus!',
+      cancelButtonText: 'Batal'
+    });
+
+    // Jika user menekan tombol "Ya, Hapus!"
+    if (result.isConfirmed) {
+      try {
+        await api.delete(`/users/${id}`);
+        fetchUsers(); // Menyegarkan data tabel
+        
+        // Menampilkan pop-up sukses
+        Swal.fire({
+          title: 'Terhapus!',
+          text: 'Akun kasir berhasil dihapus.',
+          icon: 'success',
+          confirmButtonColor: '#2563eb', // Warna blue-600 Tailwind
+        });
+      } catch (err) {
+        // Menampilkan pop-up error jika API gagal
+        Swal.fire({
+          title: 'Gagal',
+          text: 'Terjadi kesalahan saat menghapus kasir.',
+          icon: 'error',
+          confirmButtonColor: '#2563eb',
+        });
+      }
     }
   };
 
