@@ -171,30 +171,31 @@ export default function OwnerDashboard() {
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900">
       <header className="bg-white shadow">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex flex-col md:flex-row max-w-7xl items-center justify-between px-4 lg:px-6 py-4 gap-4">
+          <div className="flex items-center gap-3 w-full md:w-auto justify-center md:justify-start">
             <ShieldCheck className="text-blue-600" size={28} />
             <div>
               <h1 className="text-lg font-bold">Dashboard Owner</h1>
               <p className="text-xs text-gray-500">Selamat datang, {user?.nama}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          
+          <div className="flex flex-wrap items-center justify-center gap-2 w-full md:w-auto">
             <button
               onClick={() => router.push('/profil')}
-              className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+              className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-xs lg:text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
             >
               <UserCircle size={16} /> Profil
             </button>
             <button
               onClick={() => router.push('/owner/pegawai')}
-              className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+              className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-xs lg:text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
             >
               <Users size={16} /> Pegawai
             </button>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+              className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs lg:text-sm font-semibold text-red-600 transition hover:bg-red-100"
             >
               <LogOut size={16} /> Logout
             </button>

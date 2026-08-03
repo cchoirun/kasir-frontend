@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
 import api from '@/lib/api';
-import { ShoppingCart, LogOut, Trash2, Plus, Minus, QrCode, CheckCircle2, Search, History, Printer, X, Key, UserCircle } from 'lucide-react';
+import { ShoppingCart, LogOut, Trash2, Plus, Minus, QrCode, Search, History, Printer, X, Key, UserCircle } from 'lucide-react';
 
 export default function KasirPage() {
   const [user, setUser] = useState<any>(null);
@@ -54,18 +54,24 @@ export default function KasirPage() {
 
   const addToCart = (product: any) => {
     if (product.stok <= 0) {
-   return Swal.fire({
-     title: 'Stok Habis',
-     text: `Maaf, stok ${product.nama} sedang kosong.`,
-     icon: 'error',
-     confirmButtonColor: '#dc2626', // Warna red-600 Tailwind
-   });
- }
+      return Swal.fire({
+        title: 'Stok Habis',
+        text: `Maaf, stok ${product.nama} sedang kosong.`,
+        icon: 'error',
+        confirmButtonColor: '#dc2626',
+      });
+    }
+    
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.id === product.id);
       if (existing) {
         if (existing.qty >= product.stok) {
-          alert('Jumlah melebihi stok!');
+          Swal.fire({
+            title: 'Batas Stok Maksimal!',
+            text: 'Jumlah barang melebihi sisa stok yang tersedia.',
+            icon: 'warning',
+            confirmButtonColor: '#f59e0b', // warna kuning-oranye amber-500
+          });
           return prevCart;
         }
         return prevCart.map((item) => item.id === product.id ? { ...item, qty: item.qty + 1 } : item);
@@ -113,16 +119,16 @@ export default function KasirPage() {
 
   const handleCheckout = async (metode: 'tunai' | 'qris') => {
     if (cart.length === 0) {
-   return Swal.fire({
-     title: 'Keranjang Kosong!',
-     text: 'Silakan tambahkan produk terlebih dahulu.',
-     icon: 'warning',
-     confirmButtonColor: '#2563eb', 
-     confirmButtonText: 'Oke, Mengerti'
-   });
- }
+      return Swal.fire({
+        title: 'Keranjang Kosong!',
+        text: 'Silakan tambahkan produk terlebih dahulu.',
+        icon: 'warning',
+        confirmButtonColor: '#2563eb', 
+        confirmButtonText: 'Oke, Mengerti'
+      });
+    }
+    
     try {
-     
       const payload = {
         metode_bayar: metode,
         discount: discount,
@@ -137,7 +143,6 @@ export default function KasirPage() {
       };
       
       const res = await api.post('/transactions', payload);
-      
       const transaction = res.data.data;
 
       if (metode === 'tunai') {
@@ -149,7 +154,12 @@ export default function KasirPage() {
         setModalQR(true);
       }
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Gagal memproses transaksi');
+      Swal.fire({
+        title: 'Gagal',
+        text: err.response?.data?.error || 'Gagal memproses transaksi',
+        icon: 'error',
+        confirmButtonColor: '#dc2626',
+      });
     }
   };
 
@@ -159,7 +169,12 @@ export default function KasirPage() {
       await api.post('/webhooks/payment', { qris_reference_id: qrisData.qris_reference_id });
       handleTransactionSuccess('qris', qrisData.transaction_id, qrisData.qris_reference_id);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Gagal simulasi pembayaran');
+      Swal.fire({
+         title: 'Gagal',
+         text: err.response?.data?.error || 'Gagal simulasi pembayaran',
+         icon: 'error',
+         confirmButtonColor: '#dc2626',
+      });
     }
   };
 
@@ -168,11 +183,21 @@ export default function KasirPage() {
     e.preventDefault();
     try {
       await api.put('/auth/change-password', pwdData);
-      alert('Password berhasil diperbarui! Silakan gunakan password baru pada login berikutnya.');
+      Swal.fire({
+        title: 'Berhasil!',
+        text: 'Password berhasil diperbarui! Silakan gunakan password baru pada login berikutnya.',
+        icon: 'success',
+        confirmButtonColor: '#2563eb',
+      });
       setShowPasswordModal(false);
       setPwdData({ old_password: '', new_password: '' });
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Gagal mengubah password');
+      Swal.fire({
+        title: 'Gagal',
+        text: err.response?.data?.error || 'Gagal mengubah password',
+        icon: 'error',
+        confirmButtonColor: '#dc2626',
+      });
     }
   };
 
@@ -188,15 +213,19 @@ export default function KasirPage() {
 
   return (
     <>
-      <div className="flex h-screen bg-gray-100 text-gray-900 overflow-hidden print:hidden">
+      <div className="flex flex-col lg:flex-row h-screen bg-gray-100 text-gray-900 overflow-hidden print:hidden">
         
-        <div className="flex-1 flex flex-col h-full border-r border-gray-200">
-          <header className="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm">
-            <div>
+        {/* AREA KIRI: KATALOG PRODUK */}
+        <div className="flex-1 flex flex-col h-[60%] lg:h-full border-b lg:border-b-0 lg:border-r border-gray-200">
+          <header className="bg-white border-b px-4 lg:px-6 py-4 flex flex-col md:flex-row items-center justify-between shadow-sm gap-3">
+            <div className="w-full flex justify-between md:w-auto">
               <h1 className="text-lg font-bold">Kasir POS</h1>
-              <p className="text-xs text-gray-500">Petugas: {user?.nama}</p>
+              <p className="text-xs text-gray-500 md:hidden">Petugas: {user?.nama}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="hidden md:block text-center">
+               <p className="text-xs text-gray-500">Petugas: {user?.nama}</p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2 w-full md:w-auto">
               <button
                 onClick={() => router.push('/riwayat')}
                 className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-200"
@@ -215,8 +244,8 @@ export default function KasirPage() {
             </div>
           </header>
 
-          <div className="bg-white p-4 border-b border-gray-100">
-            <div className="relative max-w-md">
+          <div className="bg-white p-3 lg:p-4 border-b border-gray-100">
+            <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
@@ -228,31 +257,37 @@ export default function KasirPage() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
-            {filteredProducts.map((p) => (
-              <div key={p.id} className={`flex items-center justify-between p-4 rounded-xl border bg-white shadow-sm transition hover:shadow-md ${p.stok <= 0 ? 'opacity-60 bg-gray-50' : 'border-gray-200'}`}>
-                <div className="flex flex-col">
-                  <span className="text-[10px] uppercase font-bold text-blue-600 mb-1">{p.kategori || 'Umum'}</span>
-                  <span className="font-semibold text-gray-800 text-sm">{p.nama}</span>
-                  <span className="text-xs mt-1 text-gray-500">Stok: <span className={p.stok <= p.stok_minimum ? 'text-red-500 font-bold' : 'text-green-600 font-bold'}>{p.stok}</span></span>
+          <div className="flex-1 overflow-y-auto p-3 lg:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
+              {filteredProducts.map((p) => (
+                <div key={p.id} className={`flex items-center justify-between p-3 lg:p-4 rounded-xl border bg-white shadow-sm transition hover:shadow-md ${p.stok <= 0 ? 'opacity-60 bg-gray-50' : 'border-gray-200'}`}>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold text-blue-600 mb-1">{p.kategori || 'Umum'}</span>
+                    <span className="font-semibold text-gray-800 text-sm">{p.nama}</span>
+                    <span className="text-xs mt-1 text-gray-500">Stok: <span className={p.stok <= p.stok_minimum ? 'text-red-500 font-bold' : 'text-green-600 font-bold'}>{p.stok}</span></span>
+                  </div>
+                  <div className="flex flex-col lg:flex-row items-end lg:items-center gap-2 lg:gap-4">
+                    <span className="font-bold text-gray-900 text-sm lg:text-base">Rp {p.harga.toLocaleString('id-ID')}</span>
+                    <button onClick={() => addToCart(p)} disabled={p.stok <= 0} className={`p-2 rounded-lg transition ${p.stok <= 0 ? 'bg-gray-200 text-gray-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'}`}>
+                      <Plus size={18} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="font-bold text-gray-900">Rp {p.harga.toLocaleString('id-ID')}</span>
-                  <button onClick={() => addToCart(p)} disabled={p.stok <= 0} className={`p-2 rounded-lg transition ${p.stok <= 0 ? 'bg-gray-200 text-gray-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'}`}>
-                    <Plus size={20} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="w-[400px] bg-white flex flex-col h-full shadow-lg z-10">
-          <div className="p-4 border-b flex items-center gap-2 font-bold text-gray-800">
-            <ShoppingCart size={20} /> Keranjang Belanja
+        {/* AREA KANAN: KERANJANG */}
+        <div className="w-full lg:w-[400px] h-[40%] lg:h-full bg-white flex flex-col shadow-lg z-10 shrink-0">
+          <div className="p-3 lg:p-4 border-b flex items-center justify-between font-bold text-gray-800">
+            <div className="flex items-center gap-2">
+               <ShoppingCart size={18} /> Keranjang
+            </div>
+            <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">{cart.length} item</span>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 divide-y divide-gray-100">
+          <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 divide-y divide-gray-100">
             {cart.map((item) => (
               <div key={item.id} className="pt-3 first:pt-0 flex items-center justify-between">
                 <div className="flex-1 pr-2">
@@ -339,8 +374,8 @@ export default function KasirPage() {
           <style dangerouslySetInnerHTML={{__html: `
             @media print {
               @page {
-                margin: 0; /* Menghilangkan margin bawaan kertas */
-                size: 80mm auto; /* Mengatur ukuran kertas jadi 80mm (standar thermal) */
+                margin: 0; 
+                size: 80mm auto; 
               }
               body {
                 -webkit-print-color-adjust: exact;
