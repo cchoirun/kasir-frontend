@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { LogOut, Package, Plus, ShieldCheck, TrendingUp, CreditCard, Award, ArrowRight, Users, Pencil, UserCircle } from 'lucide-react';
+import { LogOut, Package, Plus, ShieldCheck, TrendingUp, CreditCard, Award, ArrowRight, Users, Pencil, UserCircle, Trash2 } from 'lucide-react';
 
 export default function OwnerDashboard() {
   const [user, setUser] = useState<any>(null);
@@ -123,6 +123,39 @@ export default function OwnerDashboard() {
       alert(err.response?.data?.error || 'Gagal menyimpan produk');
     }
   };
+
+  const handleDeleteProduct = async (id: number, nama: string) => {
+  const result = await Swal.fire({
+    title: 'Hapus Produk?',
+    text: `Yakin ingin menghapus ${nama} dari katalog?`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc2626',
+    cancelButtonColor: '#9ca3af',
+    confirmButtonText: 'Ya, Hapus!',
+    cancelButtonText: 'Batal'
+  });
+
+  if (result.isConfirmed) {
+    try {
+      await api.delete(`/products/${id}`);
+      fetchData(); // Refresh tabel dan analitik
+      Swal.fire({
+        title: 'Terhapus!',
+        text: 'Produk berhasil dihapus.',
+        icon: 'success',
+        confirmButtonColor: '#2563eb',
+      });
+    } catch (err: any) {
+      Swal.fire({
+        title: 'Gagal',
+        text: err.response?.data?.error || 'Gagal menghapus produk',
+        icon: 'error',
+        confirmButtonColor: '#2563eb',
+      });
+    }
+  }
+};
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -256,7 +289,6 @@ export default function OwnerDashboard() {
                     products.map((p) => (
                       <tr key={p.id} className="hover:bg-gray-50">
                         
-                        {/* ===== INI KODE POIN E (THUMBNAIL FOTO DI TABEL) ===== */}
                         <td className="px-6 py-4 font-medium flex items-center gap-3">
                           {p.foto_produk ? (
                             <img src={p.foto_produk} alt={p.nama} className="w-8 h-8 rounded object-cover border" />
@@ -276,13 +308,20 @@ export default function OwnerDashboard() {
                             <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-600 uppercase border border-emerald-200">Aman</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-6 py-4 text-center flex items-center justify-center gap-2">
                           <button 
                             onClick={() => openEditModal(p)} 
                             className="p-2 text-blue-500 hover:bg-blue-50 hover:text-blue-700 rounded transition"
                             title="Edit Produk"
                           >
                             <Pencil size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteProduct(p.id, p.nama)} 
+                            className="p-2 text-red-500 hover:bg-red-50 hover:text-red-700 rounded transition"
+                            title="Hapus Produk"
+                          >
+                            <Trash2 size={16} />
                           </button>
                         </td>
                       </tr>
